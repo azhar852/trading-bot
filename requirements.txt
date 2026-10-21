@@ -1,6 +1,4 @@
 flask
 requests
 beautifulsoup4
-transformers
-torch
-lxml
+gunicorn
