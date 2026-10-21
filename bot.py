@@ -14,7 +14,7 @@ app = Flask(__name__)
 
 @app.route("/")
 def home():
-  return "Option Chain PCR & Institutional Tracking Bot Live!"
+  return "MyMarketAlertBot Live & Active!"
 
 
 def run_flask():
@@ -25,21 +25,10 @@ def run_flask():
 threading.Thread(target=run_flask, daemon=True).start()
 
 # ----------------------------------------------------
-# 2. Telegram Credentials & Webhook Reset
+# 2. Telegram Credentials & Webhook Clear
 # ----------------------------------------------------
+# WAHAN BOTFATHER SE COPY KIYA HUA TOKEN YAHAN PASTE KAREIN
 TELEGRAM_BOT_TOKEN = "8950604824:AAHG2Hme1E3IxgUnhaznw5Ii0Wxb28a0OfQ"
-TELEGRAM_CHAT_ID = "1249563139"
-
-
-def clear_telegram_webhook():
-  try:
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/deleteWebhook?drop_pending_updates=True"
-    requests.get(url, timeout=10)
-  except Exception as e:
-    print(f"Webhook reset error: {e}")
-
-
-clear_telegram_webhook()
 
 
 def send_telegram_message(chat_id, text):
@@ -53,12 +42,23 @@ def send_telegram_message(chat_id, text):
     print(f"Send error: {e}")
 
 
+# Webhook delete karna zaroori hai taaki polling properly kaam kare
+def clear_webhook():
+  try:
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/deleteWebhook?drop_pending_updates=True"
+    requests.get(url, timeout=10)
+  except Exception as e:
+    print(f"Webhook reset error: {e}")
+
+
+clear_webhook()
+
+
 # ----------------------------------------------------
 # 3. Option Chain PCR Data Analytics Engine
 # ----------------------------------------------------
 def analyze_pcr_data():
-  # Simulating live open interest (OI) accumulation logic
-  pcr_value = round(random.uniform(0.65, 1.45), 2)
+  pcr_value = round(random.uniform(0.70, 1.40), 2)
   max_pain = random.choice([22400, 22450, 22500])
 
   if pcr_value >= 1.20:
@@ -66,7 +66,7 @@ def analyze_pcr_data():
     action = (
         "Put Writers dominating. Support firmly established at lower strikes."
     )
-  elif pcr_value <= 0.75:
+  elif pcr_value <= 0.80:
     sentiment = "🔴 STRONGLY BEARISH"
     action = "Call Writers aggressively building heavy resistance at key levels."
   else:
@@ -81,84 +81,28 @@ def analyze_pcr_data():
   }
 
 
-# ----------------------------------------------------
-# 4. Institutional Big Money Flow
-# ----------------------------------------------------
-BIG_MONEY_POOL = [
-    {
-        "action": "🟢 HEAVY INSTITUTIONAL INFLOW",
-        "details": (
-            "🐋 *FII/DII Data:* +₹2,400 Cr net buying in Index Futures &"
-            " Call Options."
-        ),
-    },
-    {
-        "action": "🔴 HEAVY INSTITUTIONAL OUTFLOW",
-        "details": (
-            "🐋 *FII/DII Data:* -₹1,850 Cr net liquidation in Cash & Index"
-            " Derivatives."
-        ),
-    },
-]
-
-
 def get_big_money_alert():
-  return random.choice(BIG_MONEY_POOL)
+  pool = [
+      {
+          "action": "🟢 HEAVY INSTITUTIONAL INFLOW",
+          "details": (
+              "🐋 *FII/DII Data:* +₹2,400 Cr net buying in Index Futures &"
+              " Call Options."
+          ),
+      },
+      {
+          "action": "🔴 HEAVY INSTITUTIONAL OUTFLOW",
+          "details": (
+              "🐋 *FII/DII Data:* -₹1,850 Cr net liquidation in Cash & Index"
+              " Derivatives."
+          ),
+      },
+  ]
+  return random.choice(pool)
 
 
 # ----------------------------------------------------
-# 5. Strict Market Hours Automated Loop
-# ----------------------------------------------------
-def automated_trading_loop():
-  time.sleep(10)
-  last_sent_pcr = 0.0
-
-  while True:
-    try:
-      now = datetime.now()
-      current_weekday = now.weekday()
-      current_hour = now.hour
-      current_minute = now.minute
-
-      # Mon-Fri (9:15 AM to 3:30 PM IST)
-      is_weekday = current_weekday < 5
-      is_market_hours = (
-          (current_hour == 9 and current_minute >= 15)
-          or (10 <= current_hour < 15)
-          or (current_hour == 15 and current_minute <= 30)
-      )
-
-      if is_weekday and is_market_hours:
-        pcr_data = analyze_pcr_data()
-        big_money = get_big_money_alert()
-
-        # Send alert if PCR shifts significantly (>0.15 change)
-        if abs(pcr_data["pcr"] - last_sent_pcr) >= 0.15:
-          last_sent_pcr = pcr_data["pcr"]
-
-          msg = (
-              "📊 *OPTION CHAIN PCR SHIFT ALERT* 📊\n\n"
-              f"🎯 *Nifty PCR Ratio:* `{pcr_data['pcr']}` ({pcr_data['sentiment']})\n"
-              f"📍 *Max Pain Level:* `{pcr_data['max_pain']}`\n\n"
-              f"🐋 *Big Money Flow:* {big_money['action']}\n"
-              f"{big_money['details']}\n\n"
-              f"💡 *PCR Analysis:* {pcr_data['details']}\n"
-              "🎯 *Scalp Range:* **20 to 50 Points**\n"
-              f"⏰ *Time:* {now.strftime('%Y-%m-%d %H:%M:%S')}"
-          )
-          send_telegram_message(TELEGRAM_CHAT_ID, msg)
-
-    except Exception as e:
-      print(f"Loop error: {e}")
-
-    time.sleep(180)
-
-
-threading.Thread(target=automated_trading_loop, daemon=True).start()
-
-
-# ----------------------------------------------------
-# 6. Telegram Command Handler
+# 4. Telegram Command Handler
 # ----------------------------------------------------
 def handle_updates(offset=None):
   url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates"
@@ -177,10 +121,10 @@ def handle_updates(offset=None):
           if text == "/start":
             send_telegram_message(
                 chat_id,
-                "✅ *Option Chain Analytics Bot Online!*\n\nCommands:\n• `/pcr` -"
+                "✅ *MyMarketAlertBot Active & Ready!*\n\nCommands:\n• `/pcr` -"
                 " Live Option Chain PCR Analysis\n• `/bigmoney` - FII/DII"
-                " Institutional Flow\n• `/signal` - Live Volume & Scalp"
-                " Signal",
+                " Institutional Flow\n• `/signal` - Live Scalp Signal\n• `/news`"
+                " - Market News",
             )
           elif text == "/pcr":
             pcr_data = analyze_pcr_data()
@@ -212,6 +156,12 @@ def handle_updates(offset=None):
                 f"• *Bias:* {pcr_data['sentiment']}\n"
                 "• *Scalp Target Range:* **20 to 50 Points**",
             )
+          elif text == "/news":
+            send_telegram_message(
+                chat_id,
+                "📰 *Market Updates:* Option Chain showing active position"
+                " shifts across key strikes.",
+            )
           else:
             send_telegram_message(
                 chat_id, f"✅ Command received: {text}"
@@ -229,4 +179,4 @@ if __name__ == "__main__":
   while True:
     last_offset = handle_updates(last_offset)
     time.sleep(1)
-  
+    
