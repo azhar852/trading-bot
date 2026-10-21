@@ -22,7 +22,7 @@ def run_flask():
   app.run(host='0.0.0.0', port=port)
 
 
-# Background thread mein Flask web server run karna taaki Render health check pass ho sake
+# Background thread mein Flask web server run karna taaki Render health check pass ho
 threading.Thread(target=run_flask, daemon=True).start()
 
 # ----------------------------------------------------
@@ -42,7 +42,6 @@ def send_telegram_message(chat_id, text):
     print(f'Send error: {e}')
 
 
-# Webhook delete karna zaroori hai taaki polling properly kaam kare
 def clear_webhook():
   try:
     url = f'https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/deleteWebhook?drop_pending_updates=True'
@@ -108,7 +107,6 @@ def get_big_money_alert():
 # ----------------------------------------------------
 def get_latest_news():
   news_pool = [
-      # Global News Updates
       (
           '🌍 *GLOBAL MARKET ALERT:* US Fed official statements indicate steady'
           ' interest rate outlook. Dow Jones and Nasdaq Futures showing flat'
@@ -128,7 +126,6 @@ def get_latest_news():
           ' earnings, providing positive global sentiment for Indian IT'
           ' stocks.'
       ),
-      # Domestic/Indian Market News
       (
           '🇮🇳 *DOMESTIC MARKET UPDATE:* Nifty trades with steady momentum near'
           ' key strike levels. Option sellers actively holding upper call'
@@ -186,7 +183,7 @@ def handle_updates(offset=None):
                 f"• *Max Pain Level:* `{pcr_data['max_pain']}`\n\n"
                 f"💡 *Derivatives Analysis:* {pcr_data['details']}",
             )
-          elif text == "/bigmoney":
+          elif text == '/bigmoney':
             bm = get_big_money_alert()
             pcr_data = analyze_pcr_data()
             send_telegram_message(
@@ -197,31 +194,30 @@ def handle_updates(offset=None):
                 f"• *PCR Sentiment:* `{pcr_data['pcr']}` -"
                 f" {pcr_data['sentiment']}",
             )
-          elif text == "/signal":
+          elif text == '/signal':
             pcr_data = analyze_pcr_data()
             send_telegram_message(
                 chat_id,
                 f"🎯 *INSTANT SCALP SIGNAL*\n\n"
                 f"• *PCR Confirmation:* `{pcr_data['pcr']}`\n"
                 f"• *Bias:* {pcr_data['sentiment']}\n"
-                "• *Scalp Target Range:* **20 to 50 Points**",
+                '• *Scalp Target Range:* **20 to 50 Points**',
             )
-          elif text == "/news":
+          elif text == '/news':
             news_msg = get_latest_news()
             send_telegram_message(chat_id, news_msg)
           else:
-            send_telegram_message(chat_id, f"✅ Command received: {text}")
+            send_telegram_message(chat_id, f'✅ Command received: {text}')
 
         offset = update_id + 1
   except Exception as e:
-    print(f"Polling error: {e}")
+    print(f'Polling error: {e}')
   return offset
 
 
-if __name__ == "__main__":
-  print("Starting Polling Loop...")
+if __name__ == '__main__':
+  print('Starting Polling Loop...')
   last_offset = None
   while True:
     last_offset = handle_updates(last_offset)
     time.sleep(1)
-              
