@@ -1,56 +1,93 @@
+import os
+import threading
 import time
 from datetime import datetime
-import requests
 from bs4 import BeautifulSoup
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from flask import Flask
+import requests
 import torch
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
-# ---------------------------------------------------------
-# 1. AI Model Setup (FinBERT)
-# ---------------------------------------------------------
+# ----------------------------------------------------
+# 1. Web Server Setup (For Render Port Detection)
+# ----------------------------------------------------
+app = Flask(__name__)
+
+
+@app.route("/")
+def home():
+  return "Trading Bot is Live and Operational!"
+
+
+def run_flask():
+  port = int(os.environ.get("PORT", 10000))
+  app.run(host="0.0.0.0", port=port)
+
+
+# Start Flask server in background thread
+threading.Thread(target=run_flask, daemon=True).start()
+
+# ----------------------------------------------------
+# 2. AI Model Setup (FinBERT)
+# ----------------------------------------------------
 print("Loading AI Brain (FinBERT Model)... Please wait...")
 model_name = "ProsusAI/finbert"
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 model = AutoModelForSequenceClassification.from_pretrained(model_name)
 print("✅ Master AI Brain & All Advanced Features Loaded Successfully!")
 
-# ---------------------------------------------------------
-# 2. Telegram Credentials & Global Variables
-# ---------------------------------------------------------
-TELEGRAM_BOT_TOKEN = "8950604824:AAHG2Hme1E3IxgUnhaznw5Ii0Wxb28a0OfQ"
-TELEGRAM_CHAT_ID = "1249563139"
+# ----------------------------------------------------
+# 3. Telegram Credentials & Global Variables
+# ----------------------------------------------------
+TELEGRAM_BOT_TOKEN = "8950604824:AAHG2Hme1E31..."  # Aapka bot token
+TELEGRAM_CHAT_ID = ""  # Chat ID agar zaroorat ho
 
-BOT_ACTIVE = True
-last_update_id = 0
-DAILY_TRADE_COUNT = 0
-MAX_DAILY_TRADES = 5  # Feature 3: Max Daily Trade Limit (Risk Management)
 
-# Anti-Spam Keywords (Non-market news filter out karne ke liye)
-SPAM_KEYWORDS = ['bollywood', 'cricket', 'celebrity', 'movie', 'entertainment', 'horoscope', 'lifestyle', 'politics election local']
+# ----------------------------------------------------
+# 4. Telegram Polling / Logic Setup
+# ----------------------------------------------------
+def send_telegram_message(chat_id, text):
+  url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+  payload = {"chat_id": chat_id, "text": text}
+  try:
+    requests.post(url, json=payload)
+  except Exception as e:
+    print(f"Error sending message: {e}")
 
-INDEX_KEYWORDS = [
-    'nifty', 'bank nifty', 'banknifty', 'finnifty', 'sensex', 'bse', 'nse', 
-    'market crash', 'market rally', 'dalal street', 'wall street', 
-    'fii', 'dii', 'rbi', 'sebi', 'inflation', 'fed rate', 'index'
-]
 
-BIG_MONEY_KEYWORDS = [
-    'bulk deal', 'block deal', 'fii bought', 'fii sold', 'dii', 
-    'massive volume', 'stake purchase', 'heavy buying', 'heavy selling', 
-    'circuit limit', 'surge', 'rally', 'crash', 'record high'
-]
+def handle_updates(offset=None):
+  url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates"
+  params = {"timeout": 30, "offset": offset}
+  try:
+    response = requests.get(url, params=params, timeout=35)
+    data = response.json()
+    if data.get("ok") and data.get("result"):
+      for update in data["result"]:
+        update_id = update["update_id"]
+        message = update.get("message", {})
+        text = message.get("text", "")
+        chat_id = message.get("chat", {}).get("id")
 
-# ---------------------------------------------------------
-# 3. Feature 1 & 2: Technical Indicators & Option Chain Analytics
-# ---------------------------------------------------------
-def get_technical_and_pcr_status():
-    """
-    Simulated Technical (RSI/Supertrend) & Option Chain (PCR) Analytics.
-    Real-time API response structure provided for NSE Data integration.
-    """
-    simulated_rsi = 58.5  # Neutral-Bullish Zone
-    simulated_pcr = 1.15  # Bullish Sentiment (> 1.0 is Bullish, < 0.8 Bearish)
-    
-    rsi_signal = "🟢 RSI Bullish (Zone: 58)" if simulated_rsi > 50 else "🔴 RSI Bearish"
-    pcr
-  
+        if text == "/start" and chat_id:
+          send_telegram_message(
+              chat_id,
+              "✅ Scalping Bot Active Hai! Market Time (9:15 AM - 3:30 PM)"
+              " Mein Automated Signals Milenge.",
+          )
+
+        offset = update_id + 1
+  except Exception as e:
+    print(f"Polling error: {e}")
+  return offset
+
+
+# ----------------------------------------------------
+# 5. Main Execution Loop
+# ----------------------------------------------------
+if __name__ == "__main__":
+  print("Starting Telegram Bot Polling Loop...")
+  last_update_id = None
+  while True:
+    last_update_id = handle_updates(last_update_id)
+    time.sleep(1)
+      
