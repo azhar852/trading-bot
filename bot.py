@@ -22,11 +22,28 @@ def run_flask():
   app.run(host='0.0.0.0', port=port)
 
 
-# Background thread mein Flask web server run karna taaki Render health check pass ho
+# Background thread mein Flask web server run karna
 threading.Thread(target=run_flask, daemon=True).start()
 
+
 # ----------------------------------------------------
-# 2. Telegram Credentials & Webhook Clear
+# 2. Auto Keep-Alive (Self-Ping to Prevent Render Sleep)
+# ----------------------------------------------------
+def keep_alive():
+  while True:
+    try:
+      # Apni Render service URL ko har 5 minute mein khud ping karega
+      requests.get('https://trading-bot-3-rkcp.onrender.com', timeout=10)
+    except Exception as e:
+      print(f'Keep-alive error: {e}')
+    time.sleep(300)  # 300 seconds = 5 minutes
+
+
+# Keep-alive background thread start karna
+threading.Thread(target=keep_alive, daemon=True).start()
+
+# ----------------------------------------------------
+# 3. Telegram Credentials & Webhook Clear
 # ----------------------------------------------------
 TELEGRAM_BOT_TOKEN = '8950604824:AAHG2Hme1E3IxgUnhaznw5Ii0Wxb28a0OfQ'
 
@@ -54,7 +71,7 @@ clear_webhook()
 
 
 # ----------------------------------------------------
-# 3. Option Chain PCR Data Analytics Engine
+# 4. Option Chain PCR Data Analytics Engine
 # ----------------------------------------------------
 def analyze_pcr_data():
   pcr_value = round(random.uniform(0.70, 1.40), 2)
@@ -103,7 +120,7 @@ def get_big_money_alert():
 
 
 # ----------------------------------------------------
-# 4. Indian & Global Market News Pool
+# 5. Indian & Global Market News Pool
 # ----------------------------------------------------
 def get_latest_news():
   news_pool = [
@@ -149,7 +166,7 @@ def get_latest_news():
 
 
 # ----------------------------------------------------
-# 5. Telegram Command Handler & Polling Loop
+# 6. Telegram Command Handler & Polling Loop
 # ----------------------------------------------------
 def handle_updates(offset=None):
   url = f'https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates'
