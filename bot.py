@@ -5,7 +5,6 @@ from datetime import datetime
 from flask import Flask
 import requests
 
-# Live data fetch karne ke liye library
 try:
   import yfinance as yf
 except ImportError:
@@ -30,25 +29,14 @@ def run_flask():
 
 threading.Thread(target=run_flask, daemon=True).start()
 
-
 # ----------------------------------------------------
-# 2. Auto Keep-Alive (Self-Ping)
-# ----------------------------------------------------
-def keep_alive():
-  while True:
-    try:
-      requests.get('https://trading-bot-3-rkcp.onrender.com', timeout=10)
-    except Exception as e:
-      print(f'Keep-alive error: {e}')
-    time.sleep(300)
-
-
-threading.Thread(target=keep_alive, daemon=True).start()
-
-# ----------------------------------------------------
-# 3. Telegram Credentials & Webhook Clear
+# 2. Telegram Credentials & Configuration
 # ----------------------------------------------------
 TELEGRAM_BOT_TOKEN = '8950604824:AAHG2Hme1E3IxgUnhaznw5Ii0Wxb28a0OfQ'
+REGISTERED_CHAT_IDS = set()
+
+# Last alert state tracker (taaki repeated/late alerts na aayein)
+LAST_SIGNAL_STATE = None
 
 
 def send_telegram_message(chat_id, text):
@@ -74,73 +62,101 @@ clear_webhook()
 
 
 # ----------------------------------------------------
-# 4. Real-Time Live Trend Engine (Nifty / Sensex / Commodities)
+# 3. Auto Keep-Alive (Self-Ping)
 # ----------------------------------------------------
-def get_live_market_trend(symbol='^NSEI'):
-  """Yahoo Finance se real live price aur change fetch karke accurate trend batata hai."""
+def keep_alive():
+  while True:
+    try:
+      requests.get('https://trading-bot-3-rkcp.onrender.com', timeout=10)
+    except Exception as e:
+      print(f'Keep-alive error: {e}')
+    time.sleep(300)
+
+
+threading.Thread(target=keep_alive, daemon=True).start()
+
+
+# ----------------------------------------------------
+# 4. Live Price Action & Fresh Entry Engine
+# ----------------------------------------------------
+def check_fresh_entry_signal(symbol='^NSEI'):
+  """Har 1 minute mein check karta hai ki Nayi Live Entry bani hai ya nahi."""
   try:
     ticker = yf.Ticker(symbol)
-    data = ticker.history(period='2d', interval='5m')
+    data = ticker.history(period='1d', interval='1m')
 
-    if len(data) >= 2:
-      current_price = round(data['Close'].iloc[-1], 2)
-      prev_price = round(data['Close'].iloc[-2], 2)
+    if len(data) >= 5:
+      latest_close = round(data['Close'].iloc[-1], 2)
+      prev_close = round(data['Close'].iloc[-2], 2)
       open_price = round(data['Open'].iloc[0], 2)
 
-      change_pct = round(
-          ((current_price - prev_price) / prev_price) * 100, 2
-      )
+      # Short-term Momentum (Last 5 candles average)
+      sma_5 = round(data['Close'].tail(5).mean(), 2)
 
-      # Accurate Bullish vs Bearish Trend Logic
-      if current_price < open_price or change_pct < -0.15:
-        status = '🔴 STRONGLY BEARISH (Sell on Rise)'
-        reason = (
-            f'Live Price (`{current_price}`) is trading below open level.'
-            ' Sellers dominate.'
-        )
-        action = 'Look for Put (PE) buying on minor bounces.'
-        bias = 'BEARISH'
-      elif current_price > open_price or change_pct > 0.15:
-        status = '🟢 STRONGLY BULLISH (Buy on Dips)'
-        reason = (
-            f'Live Price (`{current_price}`) holding strong momentum above'
-            ' open.'
-        )
-        action = 'Look for Call (CE) buying on support dips.'
-        bias = 'BULLISH'
-      else:
-        status = '⚖️ NEUTRAL / CONSOLIDATION'
-        reason = (
-            f'Live Price (`{current_price}`) moving in a tight rangebound'
-            ' zone.'
-        )
-        action = 'Wait for range breakout. Scalp with tight stop-loss.'
-        bias = 'SIDEWAYS'
-
-      return {
-          'price': current_price,
-          'change': change_pct,
-          'status': status,
-          'reason': reason,
-          'action': action,
-          'bias': bias,
-      }
+      # Entry Logic
+      if latest_close > sma_5 and prev_close <= sma_5:
+        return {
+            'type': 'BUY_CALL',
+            'price': latest_close,
+            'status': '🟢 FRESH BULLISH ENTRY TRIGGERED',
+            'action': (
+                f'Nifty breaks above 5-min average (`{sma_5}`). Good for CE'
+                ' Entry RIGHT NOW.'
+            ),
+        }
+      elif latest_close < sma_5 and prev_close >= sma_5:
+        return {
+            'type': 'BUY_PUT',
+            'price': latest_close,
+            'status': '🔴 FRESH BEARISH ENTRY TRIGGERED',
+            'action': (
+                f'Nifty breaks below 5-min average (`{sma_5}`). Good for PE'
+                ' Entry RIGHT NOW.'
+            ),
+        }
   except Exception as e:
-    print(f'Error fetching live trend: {e}')
+    print(f'Entry Check Error: {e}')
 
-  # Backup response
-  return {
-      'price': 'N/A',
-      'change': 0.0,
-      'status': '⚖️ MARKET CHECK IN PROGRESS',
-      'reason': 'Analyzing live orderflow and price action.',
-      'action': 'Verify with chart indicators.',
-      'bias': 'NEUTRAL',
-  }
+  return None
 
 
 # ----------------------------------------------------
-# 5. Telegram Command Handler & Polling Loop
+# 5. REAL-TIME INSTANT ENTRY BROADCASTER
+# ----------------------------------------------------
+def real_time_entry_scanner():
+  """Har 60 seconds mein market scan karta hai aur sirf taaza entry par hi alert bhejta hai."""
+  global LAST_SIGNAL_STATE
+
+  while True:
+    try:
+      signal = check_fresh_entry_signal('^NSEI')
+
+      # Nayi entry mili aur pehle se alag hai toh alert bhejega
+      if signal and signal['type'] != LAST_SIGNAL_STATE:
+        LAST_SIGNAL_STATE = signal['type']
+
+        if REGISTERED_CHAT_IDS:
+          msg = (
+              f"⚡ *REAL-TIME LIVE ENTRY ALERT*\n\n"
+              f"• *Status:* {signal['status']}\n"
+              f"• *Live Price:* `{signal['price']}`\n\n"
+              f"💡 *Trading Setup:* {signal['action']}\n"
+              f"⏱️ *Entry Validity:* Active Now (Strict Stop-Loss Required)"
+          )
+          for c_id in list(REGISTERED_CHAT_IDS):
+            send_telegram_message(c_id, msg)
+
+      time.sleep(60)  # Har 1 minute par scanning
+    except Exception as e:
+      print(f'Scanner Error: {e}')
+      time.sleep(60)
+
+
+threading.Thread(target=real_time_entry_scanner, daemon=True).start()
+
+
+# ----------------------------------------------------
+# 6. Telegram Command Handler
 # ----------------------------------------------------
 def handle_updates(offset=None):
   url = f'https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates'
@@ -156,66 +172,39 @@ def handle_updates(offset=None):
         chat_id = message.get('chat', {}).get('id')
 
         if chat_id:
+          REGISTERED_CHAT_IDS.add(chat_id)
+
           if text in ['/start', 'start']:
             send_telegram_message(
                 chat_id,
-                '✅ *MyMarketAlertBot Live & Sync Ready!*\n\n'
+                '✅ *MyMarketAlertBot Real-Time Entry Scanner Ready!*\n\n'
+                'Ab jab bhi fresh Entry trigger hogi, aapko instant alert'
+                ' milega.\n\n'
                 'Commands:\n'
-                '• `/trend` - Real-Time Market Trend (Bullish / Bearish)\n'
-                '• `/nifty` - Live Nifty 50 Real Price & Bias\n'
-                '• `/sensex` - Live Sensex Analytics\n'
-                '• `/pcr` - Live Option PCR View\n'
-                '• `/commodity` - Live MCX Commodity Setup\n'
-                '• `/signal` - Real-Time Scalp Signal',
+                '• `/signal` - Instant Scalp Check\n'
+                '• `/nifty` - Live Nifty Real Price\n'
+                '• `/bigmoney` - Smart Money Flow\n'
+                '• `/commodity` - Live MCX Alerts',
             )
-          elif text in ['/trend', '/market']:
-            tr = get_live_market_trend('^NSEI')
-            send_telegram_message(
-                chat_id,
-                f"🎯 *REAL LIVE MARKET TREND*\n\n"
-                f"• *Live Price:* `{tr['price']}` ({tr['change']}%)\n"
-                f"• *Current Trend:* {tr['status']}\n"
-                f"• *Analysis:* {tr['reason']}\n\n"
-                f"💡 *Actionable Advice:* {tr['action']}",
-            )
-          elif text in ['/nifty', '/nifty50']:
-            tr = get_live_market_trend('^NSEI')
-            send_telegram_message(
-                chat_id,
-                f"📊 *NIFTY 50 REAL-TIME ANALYTICS*\n\n"
-                f"• *Nifty Price:* `{tr['price']}` ({tr['change']}%)\n"
-                f"• *Market Bias:* {tr['status']}\n"
-                f"💡 *Trading Plan:* {tr['action']}",
-            )
-          elif text in ['/sensex']:
-            tr = get_live_market_trend('^BSESN')
-            send_telegram_message(
-                chat_id,
-                f"📈 *BSE SENSEX REAL-TIME ANALYTICS*\n\n"
-                f"• *Sensex Price:* `{tr['price']}` ({tr['change']}%)\n"
-                f"• *Market Bias:* {tr['status']}\n"
-                f"💡 *Trading Plan:* {tr['action']}",
-            )
-          elif text == '/signal':
-            tr = get_live_market_trend('^NSEI')
-            send_telegram_message(
-                chat_id,
-                f"🎯 *REAL-TIME SCALP SIGNAL*\n\n"
-                f"• *Index Price:* `{tr['price']}`\n"
-                f"• *Signal Mode:* {tr['status']}\n"
-                f"💡 *Recommendation:* {tr['action']}",
-            )
-          elif text == '/commodity':
-            send_telegram_message(
-                chat_id,
-                '🛢️ *MCX COMMODITY REAL-TIME ALERT*\n\n'
-                '• *Crude Oil:* Check intraday momentum near key support\n'
-                '• *Gold/Silver:* Watch US Dollar Index movement\n'
-                '💡 *Strategy:* Trade strictly with live trend direction.',
-            )
+          elif text in ['/signal', '/trend']:
+            try:
+              ticker = yf.Ticker('^NSEI')
+              df = ticker.history(period='1d', interval='1m')
+              lp = round(df['Close'].iloc[-1], 2)
+              send_telegram_message(
+                  chat_id,
+                  f'🎯 *LIVE SCALP CHECK*\n\n• *Live Nifty Price:* `{lp}`\n•'
+                  ' *Scanner:* Continuous 1-min active scanning for fresh'
+                  ' breakouts.',
+              )
+            except Exception:
+              send_telegram_message(
+                  chat_id, '⚡ Market Scanner active. Waiting for fresh setup.'
+              )
           else:
             send_telegram_message(
-                chat_id, '✅ Command received. Type `/trend` to check live market.'
+                chat_id,
+                '✅ Command received. Real-time entry scanner active.',
             )
 
         offset = update_id + 1
@@ -230,3 +219,4 @@ if __name__ == '__main__':
   while True:
     last_offset = handle_updates(last_offset)
     time.sleep(1)
+      
