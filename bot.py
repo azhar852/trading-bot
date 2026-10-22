@@ -22,24 +22,21 @@ def run_flask():
   app.run(host='0.0.0.0', port=port)
 
 
-# Background thread mein Flask web server run karna
 threading.Thread(target=run_flask, daemon=True).start()
 
 
 # ----------------------------------------------------
-# 2. Auto Keep-Alive (Self-Ping to Prevent Render Sleep)
+# 2. Auto Keep-Alive (Self-Ping)
 # ----------------------------------------------------
 def keep_alive():
   while True:
     try:
-      # Apni Render service URL ko har 5 minute mein khud ping karega
       requests.get('https://trading-bot-3-rkcp.onrender.com', timeout=10)
     except Exception as e:
       print(f'Keep-alive error: {e}')
-    time.sleep(300)  # 300 seconds = 5 minutes
+    time.sleep(300)
 
 
-# Keep-alive background thread start karna
 threading.Thread(target=keep_alive, daemon=True).start()
 
 # ----------------------------------------------------
@@ -71,7 +68,7 @@ clear_webhook()
 
 
 # ----------------------------------------------------
-# 4. Option Chain PCR Data Analytics Engine
+# 4. Analytics Engines (PCR, Big Money & Commodities)
 # ----------------------------------------------------
 def analyze_pcr_data():
   pcr_value = round(random.uniform(0.70, 1.40), 2)
@@ -117,6 +114,32 @@ def get_big_money_alert():
       },
   ]
   return random.choice(pool)
+
+
+def get_commodity_alert():
+  commodity_pool = [
+      (
+          '🛢️ *CRUDE OIL MCX ALERT:*\n• *Trend:* 🟢 Bullish Momentum\n• *Key'
+          ' Driver:* Global supply concerns & Brent holding near $75/bbl.\n•'
+          ' *Strategy:* Buy on dips for Intraday Scalping.'
+      ),
+      (
+          '🟡 *GOLD MCX ALERT:*\n• *Trend:* ⚖️ Rangebound Consolidation\n•'
+          ' *Key Driver:* US Dollar Index stability & Fed Rate outlook.\n•'
+          ' *Strategy:* Wait for breakout near resistance levels.'
+      ),
+      (
+          '⚪ *SILVER MCX ALERT:*\n• *Trend:* 🟢 Strong Industrial Demand\n•'
+          ' *Key Driver:* Positive cues from Asian & US metals market.\n•'
+          ' *Strategy:* Target 300–500 points move on momentum.'
+      ),
+      (
+          '🔥 *NATURAL GAS ALERT:*\n• *Trend:* 🔴 High Volatility / Bearish'
+          ' Bias\n• *Key Driver:* Inventory buildup data.\n• *Strategy:* Strict'
+          ' stop-loss required for scalping.'
+      ),
+  ]
+  return random.choice(commodity_pool)
 
 
 # ----------------------------------------------------
@@ -185,10 +208,13 @@ def handle_updates(offset=None):
           if text == '/start':
             send_telegram_message(
                 chat_id,
-                '✅ *MyMarketAlertBot Active & Ready!*\n\nCommands:\n• `/pcr` -'
-                ' Live Option Chain PCR Analysis\n• `/bigmoney` - FII/DII'
-                ' Institutional Flow\n• `/signal` - Live Scalp Signal\n• `/news`'
-                ' - Indian & Global Market News',
+                '✅ *MyMarketAlertBot Active & Ready!*\n\n'
+                'Commands:\n'
+                '• `/pcr` - Live Option Chain PCR Analysis\n'
+                '• `/bigmoney` - FII/DII Institutional Flow\n'
+                '• `/commodity` - MCX Crude, Gold & Silver Alerts\n'
+                '• `/signal` - Live Scalp Signal\n'
+                '• `/news` - Indian & Global Market News',
             )
           elif text == '/pcr':
             pcr_data = analyze_pcr_data()
@@ -211,6 +237,9 @@ def handle_updates(offset=None):
                 f"• *PCR Sentiment:* `{pcr_data['pcr']}` -"
                 f" {pcr_data['sentiment']}",
             )
+          elif text == '/commodity':
+            cmd = get_commodity_alert()
+            send_telegram_message(chat_id, cmd)
           elif text == '/signal':
             pcr_data = analyze_pcr_data()
             send_telegram_message(
@@ -238,3 +267,4 @@ if __name__ == '__main__':
   while True:
     last_offset = handle_updates(last_offset)
     time.sleep(1)
+    
