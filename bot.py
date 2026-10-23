@@ -19,7 +19,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-  return 'MyMarketAlertBot Live & Active with AI!'
+  return 'MyMarketAlertBot Live with Reversal & AI!'
 
 
 def run_flask():
@@ -77,7 +77,7 @@ threading.Thread(target=keep_alive, daemon=True).start()
 
 
 # ----------------------------------------------------
-# 4. Live Trend, PCR & Smart Money Engine
+# 4. Live Trend, Reversal & Smart Money Engine
 # ----------------------------------------------------
 def get_live_market_trend(symbol='^NSEI'):
   try:
@@ -93,27 +93,18 @@ def get_live_market_trend(symbol='^NSEI'):
 
       if current_price < open_price or change_pct < -0.15:
         status = '🔴 STRONGLY BEARISH (Sell on Rise)'
-        reason = (
-            f'Live Price (`{current_price}`) is trading below open level.'
-            ' Sellers dominate.'
-        )
+        reason = f'Live Price (`{current_price}`) trading below open level.'
         action = 'Look for Put (PE) buying on minor bounces.'
         bias = 'BEARISH'
       elif current_price > open_price or change_pct > 0.15:
         status = '🟢 STRONGLY BULLISH (Buy on Dips)'
-        reason = (
-            f'Live Price (`{current_price}`) holding strong momentum above'
-            ' open.'
-        )
+        reason = f'Live Price (`{current_price}`) holding above open.'
         action = 'Look for Call (CE) buying on support dips.'
         bias = 'BULLISH'
       else:
         status = '⚖️ NEUTRAL / CONSOLIDATION'
-        reason = (
-            f'Live Price (`{current_price}`) moving in a tight rangebound'
-            ' zone.'
-        )
-        action = 'Wait for range breakout. Scalp with tight stop-loss.'
+        reason = f'Live Price (`{current_price}`) in tight rangebound zone.'
+        action = 'Wait for range breakout.'
         bias = 'SIDEWAYS'
 
       return {
@@ -135,6 +126,43 @@ def get_live_market_trend(symbol='^NSEI'):
       'action': 'Verify with chart indicators.',
       'bias': 'NEUTRAL',
   }
+
+
+def check_reversal_pattern(symbol='^NSEI'):
+  """Live price action se top aur bottom reversal detect karta hai."""
+  try:
+    ticker = yf.Ticker(symbol)
+    data = ticker.history(period='1d', interval='5m')
+
+    if len(data) >= 6:
+      c1 = data['Close'].iloc[-1]
+      c2 = data['Close'].iloc[-2]
+      c3 = data['Close'].iloc[-3]
+      c4 = data['Close'].iloc[-4]
+      sma_5 = data['Close'].tail(5).mean()
+
+      # Bullish Reversal: Downward momentum ke baad sharp bounce
+      if c4 > c3 > c2 and c1 > sma_5 and c1 > c2:
+        return {
+            'type': 'BULLISH_REVERSAL',
+            'status': '🟢 BULLISH REVERSAL DETECTED (Bottom Reversal)',
+            'price': round(c1, 2),
+            'details': 'Sellers exhausting. Price bouncing back up from low level.',
+            'action': 'Possible CE Buying Zone / Cover PE Shorts.'
+        }
+      # Bearish Reversal: Upward momentum ke baad sharp rejection
+      elif c4 < c3 < c2 and c1 < sma_5 and c1 < c2:
+        return {
+            'type': 'BEARISH_REVERSAL',
+            'status': '🔴 BEARISH REVERSAL DETECTED (Top Reversal)',
+            'price': round(c1, 2),
+            'details': 'Buyers exhausting. Profit booking/selling started from high level.',
+            'action': 'Possible PE Buying Zone / Exit Long CE.'
+        }
+  except Exception as e:
+    print(f'Reversal Check Error: {e}')
+
+  return None
 
 
 def analyze_pcr_data():
@@ -179,109 +207,48 @@ def get_big_money_alert():
     }
 
 
-# ----------------------------------------------------
-# 5. FAST AI TRADING ASSISTANT ENGINE
-# ----------------------------------------------------
 def get_ai_trading_analysis(query):
-  """User ke sawal aur live market data ke basis par fast AI response generate karta hai."""
   tr = get_live_market_trend('^NSEI')
   pcr = analyze_pcr_data()
   bm = get_big_money_alert()
+  rev = check_reversal_pattern('^NSEI')
 
-  query_lower = query.lower()
+  rev_str = rev['status'] if rev else 'No immediate reversal detected.'
 
-  # Agar query support ya resistance se judi ho
-  if 'support' in query_lower or 'resistance' in query_lower:
-    price = tr['price']
-    return (
-        f'🤖 *AI MARKET ANALYZER (S/R Levels)*\n\n'
-        f"• *Current Nifty Price:* `{price}`\n"
-        f"• *Estimated Support:* `{price - 50 if price != 'N/A' else 'N/A'}`\n"
-        f"• *Estimated Resistance:* `{price + 50 if price != 'N/A' else 'N/A'}`\n\n"
-        f"💡 *AI Advice:* Trade carefully near these zones with strict stop-loss."
-    )
-
-  # Agar query why ya reason se judi ho
-  elif 'kyu' in query_lower or 'why' in query_lower or 'reason' in query_lower:
-    return (
-        f'🤖 *AI REASONING & MARKET INSIGHT*\n\n'
-        f"• *Current Bias:* {tr['status']}\n"
-        f"• *Live Analysis:* {tr['reason']}\n"
-        f"• *Institutional Flow:* {bm['action']}\n\n"
-        f"💡 *AI Conclusion:* Market is currently driven by {tr['bias'].lower()}"
-        ' momentum.'
-    )
-
-  # General AI Market Summary
-  else:
-    return (
-        f'🤖 *AI TRADING ASSISTANT SUMMARY*\n\n'
-        f"• *Query:* _{query}_\n"
-        f"• *Nifty Live:* `{tr['price']}` ({tr['change']}%)\n"
-        f"• *Market Sentiment:* {tr['status']}\n"
-        f"• *Option PCR:* `{pcr['pcr']}` ({pcr['sentiment']})\n"
-        f"• *Smart Money:* {bm['action']}\n\n"
-        f"💡 *AI Recommendation:* {tr['action']}"
-    )
-
-
-def check_fresh_entry_signal(symbol='^NSEI'):
-  try:
-    ticker = yf.Ticker(symbol)
-    data = ticker.history(period='1d', interval='1m')
-
-    if len(data) >= 5:
-      latest_close = round(data['Close'].iloc[-1], 2)
-      prev_close = round(data['Close'].iloc[-2], 2)
-      sma_5 = round(data['Close'].tail(5).mean(), 2)
-
-      if latest_close > sma_5 and prev_close <= sma_5:
-        return {
-            'type': 'BUY_CALL',
-            'price': latest_close,
-            'status': '🟢 FRESH BULLISH ENTRY TRIGGERED',
-            'action': (
-                f'Nifty breaks above 5-min average (`{sma_5}`). Good for CE'
-                ' Entry RIGHT NOW.'
-            ),
-        }
-      elif latest_close < sma_5 and prev_close >= sma_5:
-        return {
-            'type': 'BUY_PUT',
-            'price': latest_close,
-            'status': '🔴 FRESH BEARISH ENTRY TRIGGERED',
-            'action': (
-                f'Nifty breaks below 5-min average (`{sma_5}`). Good for PE'
-                ' Entry RIGHT NOW.'
-            ),
-        }
-  except Exception as e:
-    print(f'Entry Check Error: {e}')
-  return None
+  return (
+      f'🤖 *AI TRADING ASSISTANT SUMMARY*\n\n'
+      f'• *Query:* _{query}_\n'
+      f"• *Nifty Live:* `{tr['price']}` ({tr['change']}%)\n"
+      f"• *Market Bias:* {tr['status']}\n"
+      f'• *Reversal Alert:* {rev_str}\n'
+      f"• *Smart Money:* {bm['action']}\n\n"
+      f"💡 *AI Recommendation:* {tr['action']}"
+  )
 
 
 # ----------------------------------------------------
-# 6. REAL-TIME INSTANT ENTRY & AI BROADCASTER
+# 5. REAL-TIME REVERSAL & ENTRY SCANNER
 # ----------------------------------------------------
 def real_time_entry_scanner():
   global LAST_SIGNAL_STATE
   while True:
     try:
-      signal = check_fresh_entry_signal('^NSEI')
-      if signal and signal['type'] != LAST_SIGNAL_STATE:
-        LAST_SIGNAL_STATE = signal['type']
+      rev = check_reversal_pattern('^NSEI')
+      
+      if rev and rev['type'] != LAST_SIGNAL_STATE:
+        LAST_SIGNAL_STATE = rev['type']
         if REGISTERED_CHAT_IDS:
-          bm = get_big_money_alert()
           msg = (
-              f"⚡ *AI + REAL-TIME ENTRY ALERT*\n\n"
-              f"• *Entry Status:* {signal['status']}\n"
-              f"• *Live Price:* `{signal['price']}`\n"
-              f"• *Smart Money Flow:* {bm['action']}\n\n"
-              f"💡 *AI Setup:* {signal['action']}\n"
-              f"⏱️ *Entry Window:* ACTIVE NOW"
+              f"🔄 *REAL-TIME REVERSAL ALERT*\n\n"
+              f"• *Status:* {rev['status']}\n"
+              f"• *Trigger Price:* `{rev['price']}`\n"
+              f"• *Pattern:* {rev['details']}\n\n"
+              f"💡 *Trading Setup:* {rev['action']}\n"
+              f"⏱️ *Alert Mode:* ACTIVE REVERSAL ZONE"
           )
           for c_id in list(REGISTERED_CHAT_IDS):
             send_telegram_message(c_id, msg)
+
       time.sleep(60)
     except Exception as e:
       print(f'Scanner Error: {e}')
@@ -292,7 +259,7 @@ threading.Thread(target=real_time_entry_scanner, daemon=True).start()
 
 
 # ----------------------------------------------------
-# 7. Telegram Command Handler
+# 6. Telegram Command Handler
 # ----------------------------------------------------
 def handle_updates(offset=None):
   url = f'https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates'
@@ -314,23 +281,40 @@ def handle_updates(offset=None):
           if text_lower in ['/start', 'start']:
             send_telegram_message(
                 chat_id,
-                '✅ *MyMarketAlertBot Active with AI Assistant!*\n\n'
+                '✅ *MyMarketAlertBot Active with Reversal Engine & AI!*\n\n'
                 'Commands:\n'
-                '• `/ai <sawal>` - Ask anything to AI Market Assistant\n'
+                '• `/reversal` - Live Trend Reversal Check\n'
+                '• `/ai <sawal>` - Ask AI Trading Assistant\n'
                 '• `/trend` - Real-Time Market Trend\n'
                 '• `/nifty` - Live Nifty 50 Real Price\n'
                 '• `/sensex` - Live Sensex Analytics\n'
                 '• `/pcr` - Option Chain PCR Analysis\n'
                 '• `/bigmoney` - Live Smart Money Flow\n'
-                '• `/commodity` - Live MCX Commodity Setup\n'
+                '• `/commodity` - Live MCX Setup\n'
                 '• `/signal` - Real-Time Scalp Signal',
             )
+          elif text_lower == '/reversal':
+            rev = check_reversal_pattern('^NSEI')
+            tr = get_live_market_trend('^NSEI')
+            if rev:
+              send_telegram_message(
+                  chat_id,
+                  f"🔄 *LIVE REversal CHECK*\n\n"
+                  f"• *Status:* {rev['status']}\n"
+                  f"• *Price:* `{rev['price']}`\n"
+                  f"💡 *Action:* {rev['action']}"
+              )
+            else:
+              send_telegram_message(
+                  chat_id,
+                  f"🔄 *LIVE REVERSAL CHECK*\n\n"
+                  f"• *Current Trend:* {tr['status']}\n"
+                  f"• *Reversal Status:* ⚖️ NO REVERSAL YET (Trend Continuation)\n"
+                  f"💡 *Advice:* Trade in direction of main trend (`{tr['price']}`)."
+              )
           elif text_lower.startswith('/ai'):
-            query = text[3:].strip()
-            if not query:
-              query = 'Overall market condition'
-            ai_reply = get_ai_trading_analysis(query)
-            send_telegram_message(chat_id, ai_reply)
+            query = text[3:].strip() or 'Overall market condition'
+            send_telegram_message(chat_id, get_ai_trading_analysis(query))
           elif text_lower in ['/trend', '/market']:
             tr = get_live_market_trend('^NSEI')
             send_telegram_message(
@@ -392,15 +376,12 @@ def handle_updates(offset=None):
             send_telegram_message(
                 chat_id,
                 '🛢️ *MCX COMMODITY REAL-TIME ALERT*\n\n'
-                '• *Crude Oil / Gold / Silver:* Check live momentum near key'
-                ' levels.\n💡 *Strategy:* Trade strictly in the direction of'
-                ' live trend.',
+                '• *Crude Oil / Gold / Silver:* Check momentum near key levels.',
             )
           else:
             send_telegram_message(
                 chat_id,
-                '✅ Command received. Type `/ai <sawal>` to ask the AI Trading'
-                ' Assistant.',
+                '✅ Command received. Type `/reversal` or `/ai` for analysis.',
             )
 
         offset = update_id + 1
@@ -410,9 +391,9 @@ def handle_updates(offset=None):
 
 
 if __name__ == '__main__':
-  print('Starting Real-Time AI Polling Loop...')
+  print('Starting Reversal Engine Polling Loop...')
   last_offset = None
   while True:
     last_offset = handle_updates(last_offset)
     time.sleep(1)
-                                  
+    
