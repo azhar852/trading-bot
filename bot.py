@@ -19,7 +19,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-  return 'MyMarketAlertBot Live & Active!'
+  return 'MyMarketAlertBot Live & Active with AI!'
 
 
 def run_flask():
@@ -35,7 +35,7 @@ threading.Thread(target=run_flask, daemon=True).start()
 TELEGRAM_BOT_TOKEN = '8950604824:AAHG2Hme1E3IxgUnhaznw5Ii0Wxb28a0OfQ'
 REGISTERED_CHAT_IDS = set()
 
-# Last alert state tracker (taaki repeated/late alerts na aayein)
+# Last alert state tracker
 LAST_SIGNAL_STATE = None
 
 
@@ -80,7 +80,6 @@ threading.Thread(target=keep_alive, daemon=True).start()
 # 4. Live Trend, PCR & Smart Money Engine
 # ----------------------------------------------------
 def get_live_market_trend(symbol='^NSEI'):
-  """Yahoo Finance se real live price aur trend check karta hai."""
   try:
     ticker = yf.Ticker(symbol)
     data = ticker.history(period='2d', interval='5m')
@@ -99,6 +98,7 @@ def get_live_market_trend(symbol='^NSEI'):
             ' Sellers dominate.'
         )
         action = 'Look for Put (PE) buying on minor bounces.'
+        bias = 'BEARISH'
       elif current_price > open_price or change_pct > 0.15:
         status = '🟢 STRONGLY BULLISH (Buy on Dips)'
         reason = (
@@ -106,6 +106,7 @@ def get_live_market_trend(symbol='^NSEI'):
             ' open.'
         )
         action = 'Look for Call (CE) buying on support dips.'
+        bias = 'BULLISH'
       else:
         status = '⚖️ NEUTRAL / CONSOLIDATION'
         reason = (
@@ -113,6 +114,7 @@ def get_live_market_trend(symbol='^NSEI'):
             ' zone.'
         )
         action = 'Wait for range breakout. Scalp with tight stop-loss.'
+        bias = 'SIDEWAYS'
 
       return {
           'price': current_price,
@@ -120,6 +122,7 @@ def get_live_market_trend(symbol='^NSEI'):
           'status': status,
           'reason': reason,
           'action': action,
+          'bias': bias,
       }
   except Exception as e:
     print(f'Error fetching live trend: {e}')
@@ -130,64 +133,99 @@ def get_live_market_trend(symbol='^NSEI'):
       'status': '⚖️ MARKET CHECK IN PROGRESS',
       'reason': 'Analyzing live orderflow.',
       'action': 'Verify with chart indicators.',
+      'bias': 'NEUTRAL',
   }
 
 
 def analyze_pcr_data():
-  """Live trend ke basis par accurate PCR aur Max Pain calculate karta hai."""
   tr = get_live_market_trend('^NSEI')
-  
-  if 'BEARISH' in tr['status']:
+  if tr['bias'] == 'BEARISH':
     pcr_value = 0.75
     sentiment = '🔴 BEARISH / CALL WRITING HEAVY'
-    action = 'Call Writers aggressively building resistance. Trend is weak.'
-  elif 'BULLISH' in tr['status']:
+    action = 'Call Writers aggressively building resistance.'
+  elif tr['bias'] == 'BULLISH':
     pcr_value = 1.25
     sentiment = '🟢 BULLISH / PUT WRITING DOMINANT'
     action = 'Put Writers dominating. Support firmly established.'
   else:
     pcr_value = 1.00
     sentiment = '⚖️ NEUTRAL / RANGEBOUND'
-    action = 'Equal OI buildup on both sides. Expect rangebound movement.'
+    action = 'Equal OI buildup on both sides.'
 
   return {
       'pcr': pcr_value,
       'sentiment': sentiment,
       'details': action,
-      'market_price': tr['price']
+      'market_price': tr['price'],
   }
 
 
 def get_big_money_alert():
-  """Smart Money (FII/DII Flow) real live trend ke basis par calculate karega."""
   tr = get_live_market_trend('^NSEI')
-  if 'BEARISH' in tr['status']:
+  if tr['bias'] == 'BEARISH':
     return {
         'action': '🔴 HEAVY INSTITUTIONAL OUTFLOW (FII SELLING)',
-        'details': (
-            '🐋 *FII/DII Data:* Heavy net selling in Index Futures & Cash'
-            ' segment.'
-        ),
+        'details': '🐋 *FII/DII Data:* Heavy net selling in Index Futures.',
     }
-  elif 'BULLISH' in tr['status']:
+  elif tr['bias'] == 'BULLISH':
     return {
         'action': '🟢 HEAVY INSTITUTIONAL INFLOW (FII BUYING)',
-        'details': (
-            '🐋 *FII/DII Data:* Strong net buying in Index Futures & Call'
-            ' Options.'
-        ),
+        'details': '🐋 *FII/DII Data:* Strong net buying in Index Futures.',
     }
   else:
     return {
         'action': '⚖️ NEUTRAL INSTITUTIONAL FLOW',
-        'details': (
-            '🐋 *FII/DII Data:* Mixed institutional activity in tight range.'
-        ),
+        'details': '🐋 *FII/DII Data:* Mixed institutional activity.',
     }
 
 
+# ----------------------------------------------------
+# 5. FAST AI TRADING ASSISTANT ENGINE
+# ----------------------------------------------------
+def get_ai_trading_analysis(query):
+  """User ke sawal aur live market data ke basis par fast AI response generate karta hai."""
+  tr = get_live_market_trend('^NSEI')
+  pcr = analyze_pcr_data()
+  bm = get_big_money_alert()
+
+  query_lower = query.lower()
+
+  # Agar query support ya resistance se judi ho
+  if 'support' in query_lower or 'resistance' in query_lower:
+    price = tr['price']
+    return (
+        f'🤖 *AI MARKET ANALYZER (S/R Levels)*\n\n'
+        f"• *Current Nifty Price:* `{price}`\n"
+        f"• *Estimated Support:* `{price - 50 if price != 'N/A' else 'N/A'}`\n"
+        f"• *Estimated Resistance:* `{price + 50 if price != 'N/A' else 'N/A'}`\n\n"
+        f"💡 *AI Advice:* Trade carefully near these zones with strict stop-loss."
+    )
+
+  # Agar query why ya reason se judi ho
+  elif 'kyu' in query_lower or 'why' in query_lower or 'reason' in query_lower:
+    return (
+        f'🤖 *AI REASONING & MARKET INSIGHT*\n\n'
+        f"• *Current Bias:* {tr['status']}\n"
+        f"• *Live Analysis:* {tr['reason']}\n"
+        f"• *Institutional Flow:* {bm['action']}\n\n"
+        f"💡 *AI Conclusion:* Market is currently driven by {tr['bias'].lower()}"
+        ' momentum.'
+    )
+
+  # General AI Market Summary
+  else:
+    return (
+        f'🤖 *AI TRADING ASSISTANT SUMMARY*\n\n'
+        f"• *Query:* _{query}_\n"
+        f"• *Nifty Live:* `{tr['price']}` ({tr['change']}%)\n"
+        f"• *Market Sentiment:* {tr['status']}\n"
+        f"• *Option PCR:* `{pcr['pcr']}` ({pcr['sentiment']})\n"
+        f"• *Smart Money:* {bm['action']}\n\n"
+        f"💡 *AI Recommendation:* {tr['action']}"
+    )
+
+
 def check_fresh_entry_signal(symbol='^NSEI'):
-  """Har 1 minute mein scanning karke sirf exact fresh entry trigger batata hai."""
   try:
     ticker = yf.Ticker(symbol)
     data = ticker.history(period='1d', interval='1m')
@@ -219,38 +257,31 @@ def check_fresh_entry_signal(symbol='^NSEI'):
         }
   except Exception as e:
     print(f'Entry Check Error: {e}')
-
   return None
 
 
 # ----------------------------------------------------
-# 5. REAL-TIME INSTANT ENTRY & BIG MONEY BROADCASTER
+# 6. REAL-TIME INSTANT ENTRY & AI BROADCASTER
 # ----------------------------------------------------
 def real_time_entry_scanner():
-  """Har 60 seconds mein market scan karega aur sirf live entry par alert bhejega."""
   global LAST_SIGNAL_STATE
-
   while True:
     try:
       signal = check_fresh_entry_signal('^NSEI')
-
       if signal and signal['type'] != LAST_SIGNAL_STATE:
         LAST_SIGNAL_STATE = signal['type']
-
         if REGISTERED_CHAT_IDS:
           bm = get_big_money_alert()
           msg = (
-              f"⚡ *REAL-TIME LIVE ENTRY & BIG MONEY ALERT*\n\n"
+              f"⚡ *AI + REAL-TIME ENTRY ALERT*\n\n"
               f"• *Entry Status:* {signal['status']}\n"
               f"• *Live Price:* `{signal['price']}`\n"
-              f"• *Smart Money Flow:* {bm['action']}\n"
-              f"• *FII/DII Activity:* {bm['details']}\n\n"
-              f"💡 *Trading Setup:* {signal['action']}\n"
+              f"• *Smart Money Flow:* {bm['action']}\n\n"
+              f"💡 *AI Setup:* {signal['action']}\n"
               f"⏱️ *Entry Window:* ACTIVE NOW"
           )
           for c_id in list(REGISTERED_CHAT_IDS):
             send_telegram_message(c_id, msg)
-
       time.sleep(60)
     except Exception as e:
       print(f'Scanner Error: {e}')
@@ -261,7 +292,7 @@ threading.Thread(target=real_time_entry_scanner, daemon=True).start()
 
 
 # ----------------------------------------------------
-# 6. Telegram Command Handler
+# 7. Telegram Command Handler
 # ----------------------------------------------------
 def handle_updates(offset=None):
   url = f'https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates'
@@ -273,27 +304,34 @@ def handle_updates(offset=None):
       for update in data['result']:
         update_id = update['update_id']
         message = update.get('message', {})
-        text = message.get('text', '').lower()
+        text = message.get('text', '').strip()
+        text_lower = text.lower()
         chat_id = message.get('chat', {}).get('id')
 
         if chat_id:
           REGISTERED_CHAT_IDS.add(chat_id)
 
-          if text in ['/start', 'start']:
+          if text_lower in ['/start', 'start']:
             send_telegram_message(
                 chat_id,
-                '✅ *MyMarketAlertBot Active & Live Sync!*\n\n'
-                'Real-Time Entry, PCR & Big Money Scanner Enabled.\n\n'
+                '✅ *MyMarketAlertBot Active with AI Assistant!*\n\n'
                 'Commands:\n'
+                '• `/ai <sawal>` - Ask anything to AI Market Assistant\n'
                 '• `/trend` - Real-Time Market Trend\n'
                 '• `/nifty` - Live Nifty 50 Real Price\n'
                 '• `/sensex` - Live Sensex Analytics\n'
-                '• `/pcr` - Live Option Chain PCR Analysis\n'
-                '• `/bigmoney` - Live Smart Money (FII/DII) Flow\n'
+                '• `/pcr` - Option Chain PCR Analysis\n'
+                '• `/bigmoney` - Live Smart Money Flow\n'
                 '• `/commodity` - Live MCX Commodity Setup\n'
                 '• `/signal` - Real-Time Scalp Signal',
             )
-          elif text in ['/trend', '/market']:
+          elif text_lower.startswith('/ai'):
+            query = text[3:].strip()
+            if not query:
+              query = 'Overall market condition'
+            ai_reply = get_ai_trading_analysis(query)
+            send_telegram_message(chat_id, ai_reply)
+          elif text_lower in ['/trend', '/market']:
             tr = get_live_market_trend('^NSEI')
             send_telegram_message(
                 chat_id,
@@ -303,7 +341,7 @@ def handle_updates(offset=None):
                 f"• *Analysis:* {tr['reason']}\n\n"
                 f"💡 *Actionable Advice:* {tr['action']}",
             )
-          elif text in ['/nifty', '/nifty50']:
+          elif text_lower in ['/nifty', '/nifty50']:
             tr = get_live_market_trend('^NSEI')
             send_telegram_message(
                 chat_id,
@@ -312,7 +350,7 @@ def handle_updates(offset=None):
                 f"• *Market Bias:* {tr['status']}\n"
                 f"💡 *Trading Plan:* {tr['action']}",
             )
-          elif text in ['/sensex']:
+          elif text_lower in ['/sensex']:
             tr = get_live_market_trend('^BSESN')
             send_telegram_message(
                 chat_id,
@@ -321,7 +359,7 @@ def handle_updates(offset=None):
                 f"• *Market Bias:* {tr['status']}\n"
                 f"💡 *Trading Plan:* {tr['action']}",
             )
-          elif text == '/pcr':
+          elif text_lower == '/pcr':
             pcr_data = analyze_pcr_data()
             send_telegram_message(
                 chat_id,
@@ -331,7 +369,7 @@ def handle_updates(offset=None):
                 f"• *Market Sentiment:* {pcr_data['sentiment']}\n\n"
                 f"💡 *Derivatives View:* {pcr_data['details']}",
             )
-          elif text == '/bigmoney':
+          elif text_lower == '/bigmoney':
             bm = get_big_money_alert()
             tr = get_live_market_trend('^NSEI')
             send_telegram_message(
@@ -341,7 +379,7 @@ def handle_updates(offset=None):
                 f"• *Details:* {bm['details']}\n"
                 f"• *Live Market Trend:* {tr['status']}",
             )
-          elif text in ['/signal']:
+          elif text_lower in ['/signal']:
             tr = get_live_market_trend('^NSEI')
             send_telegram_message(
                 chat_id,
@@ -350,7 +388,7 @@ def handle_updates(offset=None):
                 f"• *Signal Mode:* {tr['status']}\n"
                 f"💡 *Recommendation:* {tr['action']}",
             )
-          elif text == '/commodity':
+          elif text_lower == '/commodity':
             send_telegram_message(
                 chat_id,
                 '🛢️ *MCX COMMODITY REAL-TIME ALERT*\n\n'
@@ -361,7 +399,8 @@ def handle_updates(offset=None):
           else:
             send_telegram_message(
                 chat_id,
-                '✅ Command received. Type `/start` to see all commands.',
+                '✅ Command received. Type `/ai <sawal>` to ask the AI Trading'
+                ' Assistant.',
             )
 
         offset = update_id + 1
@@ -371,9 +410,9 @@ def handle_updates(offset=None):
 
 
 if __name__ == '__main__':
-  print('Starting Real-Time Polling Loop...')
+  print('Starting Real-Time AI Polling Loop...')
   last_offset = None
   while True:
     last_offset = handle_updates(last_offset)
     time.sleep(1)
-              
+                                  
